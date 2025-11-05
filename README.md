@@ -193,3 +193,101 @@ The API is designed around REST principles, using specific endpoints for each ac
 | `/ticket/{session_id}` | GET    | Display Ticket: Shows the digital ticket page with the assigned slot, passcode, and the exit QR code. This is the page the user is redirected to after entry. | **200 OK** (HTML page)                                          | **404 Not Found** `{"detail":"Ticket not found"}`                                                                       |
 | `/verify`              | GET    | Show Verification Form: Validates `session_id` and `hash`; requires `status=ACTIVE` and `now < expire_at`. If valid, displays passcode entry form.           | **200 OK** (HTML form)                                          | **403 Forbidden** `{"detail":"Invalid or expired ticket"}` · **423 Locked** `{"detail":"Session locked"}`              |
 | `/verify`              | POST   | Validate Passcode & Exit: Correct passcode ⇒ mark `EXITED`, free slot, open gate. Wrong passcode ⇒ increase `fail_auth_count`, may lock after threshold.     | **200 OK** `{"message":"Verification successful. Gate opening."}` | **403 Forbidden** `{"detail":"Invalid passcode"}` · **423 Locked** `{"detail":"Session locked due to too many failed attempts"}` |
+
+---
+
+## 🧠 Design Rationale
+
+  1.Resource-Oriented Nouns
+Endpoints are named after the resources they manage (e.g., `/ticket`), not actions. The action is driven by the HTTP method (GET, POST).
+
+  2.Clear Entry Flow (GET)  
+The entry action is a GET request because scanning a physical QR code is equivalent to clicking a link. It’s simple and requires no special client-side logic.
+
+  3.Two-Step Verification 
+The exit process is split into two steps for better security and user experience:
+
+- `GET /verify?session_id=...&hash=...` — First, the QR is scanned to validate the ticket’s authenticity (HMAC hash) and check state/expiry (`status=ACTIVE`, `now < expire_at`) before asking for the secret passcode.
+- `POST /verify` — Second, the user submits the passcode. A POST is used because this action changes the state of the session (from `ACTIVE` to `EXITED` on success).
+
+**Lockout on repeated failures**  
+After too many wrong passcode attempts, the session becomes **LOCKED** (HTTP **423**). This prevents unlimited retries (brute force) and provides a clear, recoverable state for support.
+
+## ✅ Advantages
+- Works with any smartphone camera (no app needed).
+- Secure enough for university or small public use.
+- Stateless for users; minimal backend data.
+- Easy to demo using Python (Flask or FastAPI).
+- Scalable: each gate uses a static QR; backend handles logic.
+- Abuse-resistant with expiry & lockout (HTTP 423).
+- Anonymous by design (no login/PII stored).
+
+## ⚠️ Weak Points & Mitigations
+
+| Issue                           | Mitigation                                                                 |
+|---------------------------------|----------------------------------------------------------------------------|
+| User shares QR + passcode       | Short expiry (`expire_at`) or record vehicle image at entry.               |
+| Printed ticket stolen           | Single-use; ticket becomes unusable after exit (`status=EXITED`).         |
+| Secret key leakage              | Keep `SECRET_KEY` in environment variables; rotate if compromised.        |
+| Lost passcode                   | Allow staff verification via `session_id` lookup.                         |
+| Brute-force attempts            | Rate limit `/verify` and enforce lockout with `MAX_FAIL_AUTH` (HTTP 423). |
+| Ticket reuse within validity    | Single-use on exit (flip `status` to `EXITED`).                           |
+
+## 🧱 Implementation Notes
+
+- Use **HMAC-SHA256** for secure QR hashes (store only short 10-hex in URL).
+- **Rename** `expiry_time` → **`expire_at`** everywhere (DB + code).
+- **Hash passcode** with **Argon2id** (hoặc Bcrypt) — *không lưu plain*.
+- Khi cấp slot, **tránh over-allocate** bằng `SELECT … FOR UPDATE` (hoặc unique constrain/atomic update).
+- *(Optional hardening)* Basic **rate limiting** trên `/verify` (per IP + session).
+
+### QR hash (HMAC short)
+```python
+import hmac, hashlib
+
+SECRET = b"server_secret_key"
+session_id = "S-20251027-00057"
+qr_hmac_short = hmac.new(SECRET, session_id.encode(), hashlib.sha256).hexdigest()[:10]
+```
+
+---
+
+✅ Sample Source Structure
+
+guest-parking-qr/
+├── alembic/                      # Database migration scripts
+├── alembic.ini                   # Alembic configuration
+├── tests/                        # Pytest test suite
+│   ├── conftest.py               # Test fixtures (e.g., test DB)
+│   ├── test_api.py               # API endpoint tests
+│   └── test_services.py          # Business logic tests
+├── app/                          # Main application source code
+│   ├── __init__.py
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── v1/
+│   │       ├── __init__.py
+│   │       └── tickets.py        # API router for ticket endpoints
+│   ├── core/
+│   │   ├── __init__.py
+│   │   └── config.py             # Pydantic settings
+│   ├── crud/                     # Database operations
+│   │   ├── __init__.py
+│   │   └── parking.py
+│   ├── db/
+│   │   ├── __init__.py
+│   │   ├── base.py               # SQLAlchemy models base
+│   │   ├── database.py           # Database session management
+│   │   └── models.py             # SQLAlchemy ORM models
+│   ├── schemas/                  # Pydantic data schemas
+│   │   ├── __init__.py
+│   │   └── ticket.py
+│   ├── services/                 # Business logic
+│   │   ├── __init__.py
+│   │   └── ticket_service.py
+│   └── main.py                   # FastAPI application entrypoint
+├── .env.example                  # Example environment variables
+├── .gitignore
+├── pyproject.toml                # Project metadata and dependencies
+└── README.md
+
