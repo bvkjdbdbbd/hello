@@ -307,3 +307,8 @@ guest-parking-qr/
 | **Brute-force**  | ✅     | Mitigated (rate limit + lockout 423)   |
 | **Lockout**      | ✅     | With `MAX_FAIL_AUTH` (HTTP 423)        |
 
+🏁 Summary
+
+This design combines QR hash verification and one-time passcodes to provide a secure, anonymous parking ticket system without user accounts. It prevents forgery, reuse, and tampering — while remaining simple enough for university-scale deployment and demonstration.
+
+
