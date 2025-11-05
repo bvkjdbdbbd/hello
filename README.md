@@ -210,7 +210,7 @@ The exit process is split into two steps for better security and user experience
 - `GET /verify?session_id=...&hash=...` — First, the QR is scanned to validate the ticket’s authenticity (HMAC hash) and check state/expiry (`status=ACTIVE`, `now < expire_at`) before asking for the secret passcode.
 - `POST /verify` — Second, the user submits the passcode. A POST is used because this action changes the state of the session (from `ACTIVE` to `EXITED` on success).
 
-**Lockout on repeated failures**  
+> **Lockout on repeated failures**  
 After too many wrong passcode attempts, the session becomes **LOCKED** (HTTP **423**). This prevents unlimited retries (brute force) and provides a clear, recoverable state for support.
 
 ## ✅ Advantages
@@ -307,8 +307,6 @@ guest-parking-qr/
 | **Brute-force**  | ✅     | Mitigated (rate limit + lockout 423)   |
 | **Lockout**      | ✅     | With `MAX_FAIL_AUTH` (HTTP 423)        |
 
-🏁 Summary
-
-This design combines QR hash verification and one-time passcodes to provide a secure, anonymous parking ticket system without user accounts. It prevents forgery, reuse, and tampering — while remaining simple enough for university-scale deployment and demonstration.
-
-
+## 🏁 Summary
+> This design combines QR hash verification and one-time passcodes to provide a secure, anonymous parking ticket system without user accounts. It prevents forgery, reuse, and tampering — while remaining simple enough for university-scale deployment and demonstration.
+a secure, anonymous parking ticket system without user accounts. It prevents forgery, reuse, and tampering — while remaining simple enough for university-scale deployment and demonstration.
