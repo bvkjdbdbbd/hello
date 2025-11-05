@@ -25,11 +25,11 @@ Backend assigns an available slot and creates a parking session:
 
 User is shown a digital ticket, e.g.:
 
+ ```
 Slot: A-22
-
 Passcode: 8K2L9M
-
 QR: https://parking.univ.edu/ticket?session=S-20251027-00057&hash=f89e6da4b5
+```
 
 User keeps the passcode and screenshot of the ticket.
 
@@ -250,10 +250,9 @@ session_id = "S-20251027-00057"
 qr_hmac_short = hmac.new(SECRET, session_id.encode(), hashlib.sha256).hexdigest()[:10]
 ```
 
----
+## ✅ Sample Source Structure
 
-✅ Sample Source Structure
-
+```text
 guest-parking-qr/
 ├── alembic/                      # Database migration scripts
 ├── alembic.ini                   # Alembic configuration
@@ -290,4 +289,21 @@ guest-parking-qr/
 ├── .gitignore
 ├── pyproject.toml                # Project metadata and dependencies
 └── README.md
+
+```
+
+## ✅ Final Security Review
+
+| Category         | Status | Notes                                  |
+|------------------|--------|----------------------------------------|
+| Token forgery    | ✅     | Secure (HMAC; short hash in URL)       |
+| Replay attack    | ✅     | Prevented (single-use: `status=EXITED`)|
+| QR tampering     | ✅     | Invalid HMAC → rejected                |
+| Anonymous flow   | ✅     | Supported (no login/PII)               |
+| Usability        | ✅     | Simple (QR + passcode)                 |
+| Secret exposure  | ⚠️     | Protect `.env` secret; rotate if needed|
+| Scalability      | ✅     | Multi-gate ready                       |
+| **Expiration**   | ✅     | Enforced via `expire_at` check         |
+| **Brute-force**  | ✅     | Mitigated (rate limit + lockout 423)   |
+| **Lockout**      | ✅     | With `MAX_FAIL_AUTH` (HTTP 423)        |
 
