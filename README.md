@@ -3,7 +3,9 @@
 ## 🎯 Objective
 A secure, anonymous parking management system where guests scan a QR code to enter, receive a digital ticket, and verify it on exit — without needing login or a mobile app.
 
+
 **Example User Stories**
+
 - As a guest, I want to scan a QR code at the entrance to get a parking spot and digital ticket without needing to install an app.
 - As a guest, I want to scan my digital ticket at the exit and enter a simple code to leave the parking garage quickly.
 - As a parking administrator, I want the system to be secure against basic ticket forgery or reuse.
@@ -71,12 +73,10 @@ Then the system prompts for **passcode**:
 
 ```mermaid
 erDiagram
-  %% Relationships
   GATES ||--o{ PARKING_SESSIONS : has
   PARKING_SLOTS ||--o{ PARKING_SESSIONS : allocated
   PARKING_SESSIONS ||--o{ AUDIT_LOGS : emits
 
-  %% Tables
   GATES {
     UUID id PK
     STRING code
@@ -108,6 +108,7 @@ erDiagram
     INT fail_auth_count
     INT max_fail_auth
     DATETIME last_fail_at
+    DATETIME locked_until
     STRING created_ip
   }
 
@@ -118,6 +119,7 @@ erDiagram
     STRING meta
     DATETIME created_at
   }
+
 ```
 ---
 
@@ -144,6 +146,7 @@ sequenceDiagram
     Backend-->>User: 503 {"detail":"No available parking slots"}
   end
   User-->>User: Save ticket (screenshot + passcode)
+
 ```
 
 ### Exit (scan ticket QR → precheck → passcode → open gate)
@@ -171,7 +174,7 @@ sequenceDiagram
     else Wrong passcode
       Backend->>DB: UPDATE fail_auth_count += 1, last_fail_at=now
       alt fail_auth_count >= max_fail_auth
-        Backend->>DB: UPDATE status=LOCKED
+        Backend->>DB: UPDATE status=LOCKED, locked_until=now+cooldown
         Backend-->>User: 423 {"detail":"Session locked"}
       else Under threshold
         Backend-->>User: 403 {"detail":"Invalid passcode"}
@@ -181,18 +184,19 @@ sequenceDiagram
     Backend-->>User: 403 {"detail":"Invalid or expired ticket"}
     Note right of Backend: Return 423 if status=LOCKED
   end
+
 ```
 ---
 
 ### 🚀 API Endpoints
 The API is designed around REST principles, using specific endpoints for each action in the parking workflow.
 
-| Endpoint               | Method | Description                                                                                                                                                   | Success Response                                                | Error Response                                                                                                         |
-|------------------------|--------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|
-| `/entry/{gate_id}`     | GET    | Create Ticket: A user scans the static QR at a gate. The system finds a slot, creates a session, and redirects the user to their unique ticket URL.          | **302 Found** (Redirect to `/ticket/{session_id}`)              | **503 Service Unavailable** `{"detail":"No available parking slots"}`                                                   |
-| `/ticket/{session_id}` | GET    | Display Ticket: Shows the digital ticket page with the assigned slot, passcode, and the exit QR code. This is the page the user is redirected to after entry. | **200 OK** (HTML page)                                          | **404 Not Found** `{"detail":"Ticket not found"}`                                                                       |
-| `/verify`              | GET    | Show Verification Form: Validates `session_id` and `hash`; requires `status=ACTIVE` and `now < expire_at`. If valid, displays passcode entry form.           | **200 OK** (HTML form)                                          | **403 Forbidden** `{"detail":"Invalid or expired ticket"}` · **423 Locked** `{"detail":"Session locked"}`              |
-| `/verify`              | POST   | Validate Passcode & Exit: Correct passcode ⇒ mark `EXITED`, free slot, open gate. Wrong passcode ⇒ increase `fail_auth_count`, may lock after threshold.     | **200 OK** `{"message":"Verification successful. Gate opening."}` | **403 Forbidden** `{"detail":"Invalid passcode"}` · **423 Locked** `{"detail":"Session locked due to too many failed attempts"}` |
+| Endpoint               | Method | Description                                                                                                                                                   | Success Response                                                | Error Response                                                                                                                         |
+|------------------------|--------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
+| `/entry/{gate_id}`     | GET    | Create Ticket: A user scans the static QR at a gate. The system finds a slot, creates a session, and redirects the user to their unique ticket URL.          | **302 Found** (Redirect to `/ticket/{session_id}`)              | **503 Service Unavailable** `{"detail":"No available parking slots"}`                                                                   |
+| `/ticket/{session_id}` | GET    | Display Ticket: Shows the digital ticket page with the assigned slot, passcode, and the exit QR code. This is the page the user is redirected to after entry. | **200 OK** (HTML page)                                          | **404 Not Found** `{"detail":"Ticket not found"}`                                                                                       |
+| `/verify`              | GET    | Show Verification Form: Validates `session_id` and `hash`; requires `status=ACTIVE` and `now < expire_at`. If valid, displays passcode entry form.           | **200 OK** (HTML form)                                          | **403 Forbidden** `{"detail":"Invalid or expired ticket"}` · **423 Locked** `{"detail":"Session locked"}`                              |
+| `/verify`              | POST   | Validate Passcode & Exit: Correct passcode ⇒ mark `EXITED`, free slot, open gate. Wrong passcode ⇒ increase `fail_auth_count`, may lock after threshold.     | **200 OK** `{"message":"Verification successful. Gate opening."}` | **403 Forbidden** `{"detail":"Invalid passcode","remaining_attempts":<int>}` · **423 Locked** `{"detail":"Session locked due to too many failed attempts","locked_until":"<RFC3339>"}` |
 
 ---
 
@@ -234,14 +238,13 @@ After too many wrong passcode attempts, the session becomes **LOCKED** (HTTP **4
 | Ticket reuse within validity    | Single-use on exit (flip `status` to `EXITED`).                           |
 
 ## 🧱 Implementation Notes
+- Use HMAC-SHA256 for secure QR hashes (store only the first 10 hex chars in the URL).
+- Rename `expiry_time` → `expire_at` everywhere (DB + code).
+- Hash the passcode with Argon2id (or Bcrypt) — do not store plain text.
+- When assigning a slot, avoid over-allocation using `SELECT … FOR UPDATE` (or a **unique constraint** / atomic update).
+- (Optional hardening) Add basic rate limiting on `/verify` (per IP + session).
 
-- Use **HMAC-SHA256** for secure QR hashes (store only short 10-hex in URL).
-- **Rename** `expiry_time` → **`expire_at`** everywhere (DB + code).
-- **Hash passcode** with **Argon2id** (hoặc Bcrypt) — *không lưu plain*.
-- Khi cấp slot, **tránh over-allocate** bằng `SELECT … FOR UPDATE` (hoặc unique constrain/atomic update).
-- *(Optional hardening)* Basic **rate limiting** trên `/verify` (per IP + session).
-
-### QR hash (HMAC short)
+**QR hash (HMAC short)**
 ```python
 import hmac, hashlib
 
@@ -309,4 +312,3 @@ guest-parking-qr/
 
 ## 🏁 Summary
 > This design combines QR hash verification and one-time passcodes to provide a secure, anonymous parking ticket system without user accounts. It prevents forgery, reuse, and tampering — while remaining simple enough for university-scale deployment and demonstration.
-a secure, anonymous parking ticket system without user accounts. It prevents forgery, reuse, and tampering — while remaining simple enough for university-scale deployment and demonstration.
