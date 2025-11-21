@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vé Điện Tử</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        /* Nền màu xanh dương đậm Cyber */
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            height: 100vh; display: flex; justify-content: center; align-items: center; color: #333;
+        }
+
+        .ticket-card {
+            background: white;
+            width: 350px;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5); /* Đổ bóng đậm hơn */
+            animation: slideIn 0.5s ease-out;
+            position: relative;
+        }
+
+        .header { background: linear-gradient(to right, #11998e, #38ef7d); padding: 20px; text-align: center; color: white; }
+        .header h2 { font-weight: 800; letter-spacing: 1px; margin: 0; text-transform: uppercase; }
+        .header p { font-size: 12px; opacity: 0.9; margin-top: 5px; font-family: monospace; }
+        
+        .content { padding: 30px 20px; text-align: center; }
+        
+        .slot-label { font-size: 12px; color: #7f8c8d; text-transform: uppercase; letter-spacing: 2px; font-weight: bold; }
+        .slot-number { font-size: 60px; font-weight: 800; color: #1e3c72; margin: 5px 0 20px 0; line-height: 1; }
+        
+        .passcode-container {
+            background: #f0f3f4; padding: 15px; border-radius: 10px;
+            margin: 20px 0; border: 2px dashed #bdc3c7;
+        }
+        .passcode { font-size: 32px; color: #e74c3c; font-weight: 800; letter-spacing: 5px; }
+
+        /* Hiệu ứng nút bấm cho mã QR */
+        .qr-area { 
+            display: block; margin-top: 20px; cursor: pointer; text-decoration: none; 
+            transition: transform 0.2s; 
+        }
+        .qr-area:hover { transform: scale(1.05); }
+        .qr-img { border-radius: 10px; border: 5px solid #fff; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .qr-hint { 
+            color: #3498db; font-size: 12px; font-weight: 700; margin-top: 10px; display: block; 
+            animation: pulse 2s infinite;
+        }
+
+        .footer { background: #ecf0f1; padding: 15px; text-align: center; font-size: 11px; color: #7f8c8d; border-top: 1px solid #bdc3c7;}
+
+        @keyframes slideIn { from { opacity: 0; transform: translateY(50px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div class="ticket-card">
+        <div class="header">
+            <h2>VÉ GỬI XE</h2>
+            <p>ID: {{ session_id }}</p>
+        </div>
+        <div class="content">
+            <div class="slot-label">Vị trí của bạn</div>
+            <div class="slot-number">{{ slot_code }}</div>
+            
+            <div class="passcode-container">
+                <div class="slot-label">MẬT KHẨU RA CỔNG</div>
+                <div class="passcode">{{ passcode }}</div>
+            </div>
+
+            <a href="{{ verify_url }}" class="qr-area">
+                <img class="qr-img" src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data={{ verify_url }}" alt="QR Code" />
+                <span class="qr-hint">👆 BẤM VÀO ĐÂY ĐỂ QUÉT MÃ RA</span>
+            </a>
+        </div>
+        <div class="footer">
+            <strong>Giờ vào:</strong> {{ entry_time }} <br>
+            Vui lòng chụp ảnh màn hình lại để lấy xe.
+        </div>
+    </div>
+</body>
+</html>

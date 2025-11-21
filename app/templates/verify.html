@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lấy Xe Ra Cổng</title>
+    <style>
+        body { font-family: sans-serif; background-color: #e3f2fd; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 300px; text-align: center; }
+        input { width: 80%; padding: 15px; font-size: 18px; text-align: center; letter-spacing: 2px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { width: 90%; padding: 12px; background: #2196F3; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+        button:hover { background: #1976D2; }
+        #message { margin-top: 15px; font-weight: bold; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>LẤY XE</h2>
+        <p>Nhập mật khẩu trên vé của bạn:</p>
+        
+        <input type="text" id="passcode" placeholder="XXXXXX" maxlength="6">
+        <button onclick="submitExit()">XÁC NHẬN & MỞ CỔNG</button>
+        <div id="message"></div>
+    </div>
+
+    <script>
+        async function submitExit() {
+            const passcode = document.getElementById('passcode').value;
+            const msgDiv = document.getElementById('message');
+            const sessionId = "{{ session_id }}"; // Lấy từ server
+
+            msgDiv.innerText = "Đang xử lý...";
+            
+            try {
+                // Gửi lệnh lên API để kiểm tra
+                const response = await fetch(`/api/v1/verify/${sessionId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ passcode: passcode })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    msgDiv.className = "success";
+                    msgDiv.innerText = "✅ " + data.message;
+                } else {
+                    msgDiv.className = "error";
+                    msgDiv.innerText = "❌ " + (data.detail || data.error);
+                }
+            } catch (error) {
+                msgDiv.innerText = "Lỗi kết nối!";
+            }
+        }
+    </script>
+</body>
+</html>
