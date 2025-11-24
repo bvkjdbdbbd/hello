@@ -37,7 +37,6 @@ def import_csv(csv_path: str):
                     print(f"Skipping invalid row: {row}")
                     continue
 
-                # Get or create gate
                 gate = db.query(models.Gate).filter(models.Gate.name == gate_name).first()
                 if not gate:
                     gate = models.Gate(name=gate_name)
@@ -46,17 +45,14 @@ def import_csv(csv_path: str):
                     db.refresh(gate)
                     created_gates += 1
 
-                # Check slot exists by slot_code
                 existing = db.query(models.ParkingSlot).filter(models.ParkingSlot.slot_code == slot_code).first()
                 if existing:
-                    # If slot exists but not linked to this gate, optionally update gate_id
                     if existing.gate_id != gate.id:
                         existing.gate_id = gate.id
                         db.add(existing)
                         db.commit()
                         print(f"Updated slot {slot_code} -> gate {gate_name}")
                     else:
-                        # already present and correct
                         pass
                 else:
                     slot = models.ParkingSlot(slot_code=slot_code, status=models.SlotStatus.AVAILABLE, gate_id=gate.id)
