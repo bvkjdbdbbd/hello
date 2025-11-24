@@ -1,8 +1,5 @@
-# app/admin_panel.py
 from sqladmin import Admin, ModelView
 from app.db.models import Gate, ParkingSlot, ParkingTicketSession
-
-# --- Cấu hình giao diện cho từng bảng ---
 
 class GateAdmin(ModelView, model=Gate):
     name = "Cổng (Gate)"
@@ -21,20 +18,17 @@ class TicketAdmin(ModelView, model=ParkingTicketSession):
     name = "Vé Xe (Ticket)"
     name_plural = "Lịch sử Ra/Vào"
     icon = "fa-solid fa-ticket"
-    # Hiện các cột quan trọng để theo dõi
     column_list = [
         ParkingTicketSession.session_id,
         ParkingTicketSession.status,
-        ParkingTicketSession.fail_auth_count, # <--- Quan trọng: Xem ai nhập sai pass
+        ParkingTicketSession.fail_auth_count, 
         ParkingTicketSession.entry_time,
         ParkingTicketSession.exit_time
     ]
-    column_default_sort = ("entry_time", True) # Mới nhất lên đầu
+    column_default_sort = ("entry_time", True) 
 
-# --- Hàm khởi tạo Admin ---
 def setup_admin(app, engine):
     admin = Admin(app, engine, title="Smart Parking Admin")
-    # Đăng ký các bảng
     admin.add_view(GateAdmin)
     admin.add_view(SlotAdmin)
     admin.add_view(TicketAdmin)

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Quản Lý</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        .header-bg {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="flex min-h-screen">
+        <aside class="w-64 bg-white shadow-lg hidden md:block fixed h-full z-10">
+            <div class="p-6 flex items-center gap-3 border-b border-gray-100">
+                <div class="w-8 h-8 bg-blue-800 rounded-lg flex items-center justify-center text-white font-bold">P
+                </div>
+                <span class="font-bold text-xl text-blue-900">Smart Parking</span>
+            </div>
+
+            <nav class="mt-6 px-4 space-y-2">
+                <a href="#" class="flex items-center gap-3 px-4 py-3 bg-blue-50 text-blue-700 rounded-xl font-semibold">
+                    <i class="fa-solid fa-chart-pie"></i> Tổng Quan
+                </a>
+                <a href="/"
+                    class="flex items-center gap-3 px-4 py-3 text-gray-500 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition">
+                    <i class="fa-solid fa-house"></i> Về Trang Chủ
+                </a>
+                <a href="/admin" target="_blank"
+                    class="flex items-center gap-3 px-4 py-3 text-gray-500 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition">
+                    <i class="fa-solid fa-database"></i> Dữ Liệu Gốc (SQL)
+                </a>
+            </nav>
+        </aside>
+
+        <main class="flex-1 md:ml-64">
+            <header class="header-bg text-white shadow-md sticky top-0 z-20">
+                <div class="px-8 py-4 flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl font-bold">Dashboard</h2>
+                        <p class="text-xs opacity-80">Hệ thống quản lý bãi xe sinh viên</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="text-right mr-2">
+                            <div class="text-sm font-bold">Admin</div>
+                            <div class="text-xs opacity-80">Online</div>
+                        </div>
+                        <div
+                            class="w-10 h-10 rounded-full bg-white text-blue-800 flex items-center justify-center font-bold shadow">
+                            <i class="fa-solid fa-user-shield"></i>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="p-8">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div
+                        class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-blue-500 flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">Xe Đang Gửi</p>
+                            <h3 class="text-3xl font-bold text-gray-800">{{ total_active }}</h3>
+                        </div>
+                        <div
+                            class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-car"></i>
+                        </div>
+                    </div>
+
+                    <div
+                        class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-green-500 flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">Chỗ Trống</p>
+                            <h3 class="text-3xl font-bold text-gray-800">{{ available_slots }}</h3>
+                        </div>
+                        <div
+                            class="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-check"></i>
+                        </div>
+                    </div>
+
+                    <div
+                        class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-purple-500 flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">Tổng Lượt Xe</p>
+                            <h3 class="text-3xl font-bold text-gray-800">{{ total_tickets }}</h3>
+                        </div>
+                        <div
+                            class="w-12 h-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-xl">
+                            <i class="fa-solid fa-ticket"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                        <h3 class="font-bold text-gray-800 text-lg">Hoạt Động Gần Đây</h3>
+                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">Live Update</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-gray-50 text-gray-500 uppercase text-xs">
+                                <tr>
+                                    <th class="px-6 py-3">Mã Vé</th>
+                                    <th class="px-6 py-3">Trạng Thái</th>
+                                    <th class="px-6 py-3">Giờ Vào</th>
+                                    <th class="px-6 py-3">Giờ Ra</th>
+                                    <th class="px-6 py-3">Cổng</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                {% for ticket in recent_tickets %}
+                                <tr class="hover:bg-gray-50 transition">
+                                    <td class="px-6 py-4 font-medium text-gray-900">{{ ticket.session_id }}</td>
+                                    <td class="px-6 py-4">
+                                        {% if ticket.status.value == 'ACTIVE' %}
+                                        <span
+                                            class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold shadow-sm">Đang
+                                            gửi</span>
+                                        {% elif ticket.status.value == 'EXITED' %}
+                                        <span
+                                            class="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-bold">Đã
+                                            ra</span>
+                                        {% else %}
+                                        <span
+                                            class="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">Bị
+                                            khóa</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-600">{{ ticket.entry_time.strftime('%H:%M %d/%m') }}
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-600">
+                                        {{ ticket.exit_time.strftime('%H:%M %d/%m') if ticket.exit_time else '--' }}
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-600 font-semibold">
+                                        {% if ticket.gate %}
+                                        {{ ticket.gate.name }}
+                                        {% else %}
+                                        Cổng {{ ticket.gate_id }}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+</body>
+
+</html>
