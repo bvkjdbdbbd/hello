@@ -1,13 +1,13 @@
 # 🅿️ Guest Parking QR System (Smart QR Parking)
 
-Một hệ thống quản lý gửi xe an danh, bảo mật dành cho khách vãng lai (Guest/Sinh viên) dựa trên nền tảng Python (FastAPI/Flask). Hệ thống cho phép người dùng quét mã QR tĩnh tại cổng vào để nhận vé kỹ thuật số, gửi xe và xác thực bằng mã Passcode bí mật khi ra cổng — **hoàn toàn không cần đăng ký tài khoản hay cài đặt ứng dụng di động**.
+Một hệ thống quản lý gửi xe ẩn danh, bảo mật dành cho khách vãng lai (Guest/Sinh viên) dựa trên nền tảng Python (FastAPI/Flask). Hệ thống cho phép người dùng quét mã QR tĩnh tại cổng vào để nhận vé kỹ thuật số, gửi xe và xác thực bằng mã Passcode bí mật khi ra cổng — **hoàn toàn không cần đăng ký tài khoản hay cài đặt ứng dụng di động**.
 
 ---
 
 ## 🎯 Mục tiêu Dự án (Project Objective)
 
 - **Đơn giản & Tiện lợi:** Cho phép khách gửi xe chỉ bằng camera điện thoại và trình duyệt web.
-- **An danh (Anonymous):** Không thu thập dữ liệu cá nhân (tên, SĐT, email).
+- **Ẩn danh (Anonymous):** Không thu thập dữ liệu cá nhân (tên, SĐT, email).
 - **An toàn & Bảo mật:** Chống làm giả vé (HMAC Hash), chống sử dụng lại (Single-use), chống dò mã (Brute-Force Protection) và kiểm tra dung lượng bãi đỗ tự động.
 - **Thích hợp cho Demo:** Kiến trúc mô-đun rõ ràng, dễ dàng triển khai đồ án với Python.
 
@@ -19,9 +19,11 @@ Một hệ thống quản lý gửi xe an danh, bảo mật dành cho khách vã
 * **Luồng Vào:** As a guest, I want to scan a QR code at the entrance gate so that I can get an assigned parking spot and a digital ticket without installing an app.
 * **Luồng Ra:** As a guest, I want to scan my digital ticket QR at the exit gate and enter my passcode so that I can leave the parking garage quickly and safely.
 
-### 2. Parking Administrator (Bảo vệ / Quản trị viên)
-* **Quản lý Vận hành:** As an admin, I want the system to automatically block reuse or forgery of tickets and limit failed passcode attempts to prevent fraud.
-* **Quản lý Dữ liệu:** As an admin, I want expired tickets to be automatically cleaned up so that parking slots are freed for new users.
+### 2. System (Hệ thống tự vận hành)
+* **Chống gian lận:** As the system, I want to automatically block reuse or forgery of tickets and limit failed passcode attempts so that fraud is prevented without human intervention.
+* **Tự dọn dẹp dữ liệu:** As the system, I want expired tickets to be automatically cleaned up so that parking slots are freed for new users.
+
+> **Ghi chú thiết kế:** Hệ thống hoạt động theo mô hình **nologin** — không có tài khoản người dùng và không có giao diện quản trị. Việc "quản lý" được thực hiện **tự động theo vòng đời của từng phiên gửi xe** (session-based), không lưu trữ theo người dùng.
 
 ---
 
@@ -37,21 +39,18 @@ graph TD
 
     subgraph Actors ["👥 TÁC NHÂN HỆ THỐNG"]
         Guest["👤 GUEST<br/>(Khách vãng lai / Sinh viên)"]:::actorStyle
-        Admin["👮 PARKING ADMIN<br/>(Quản trị viên / Bảo vệ)"]:::actorStyle
     end
 
     subgraph SystemBoundary ["🅿️ HỆ THỐNG QUẢN LÝ GỬI XE QR"]
         direction TB
-        
+
         subgraph GuestModule ["📱 Chức năng Khách vãng lai"]
             UC101(("UC-101: Tạo Vé Gửi Xe")):::usecaseStyle
             UC102(("UC-102: Hiển thị Vé Gửi Xe")):::usecaseStyle
             UC103(("UC-103: Xác thực Vé & Ra cổng")):::usecaseStyle
         end
-        
-        subgraph AdminModule ["⚙️ Chức năng Quản trị & Hệ thống"]
-            UC201(("UC-201: Xem Tình trạng Bãi đỗ")):::usecaseStyle
-            UC202(("UC-202: Quản lý Cấu hình System")):::usecaseStyle
+
+        subgraph SystemModule ["⚙️ Tiến trình Tự động"]
             BG001(("BG-001: Expiry Cleanup Job<br/>(Tiến trình Chạy ngầm)")):::bgStyle
         end
     end
@@ -60,9 +59,8 @@ graph TD
     Guest -->|2. Xem vé / Lưu QR| UC102
     Guest -->|3. Quét QR & Nhập Passcode| UC103
 
-    Admin -->|Giám sát slot / khóa vé| UC201
-    Admin -->|Thiết lập tham số hệ thống| UC202
-    Admin -.->|Giám sát kết quả| BG001
+    UC101 -.->|Kiểm tra slot trống| BG001
+    BG001 -.->|Giải phóng slot hết hạn| UC101
 ```
 
 ---
@@ -97,9 +95,9 @@ sequenceDiagram
     else Hash hợp lệ & Ticket ACTIVE
         Backend-->>User: shows passcode entry form
         loop Thử nhập Passcode (Tối đa 5 lần)
-            User->>Backend: submits passcode
+            User->>Backend: submits passcode + gate_id
             alt Passcode ĐÚNG
-                Backend->>Backend: updates status = EXITED & frees slot
+                Backend->>Backend: updates status = EXITED, ghi gate_out & frees slot
                 Backend-->>ExitGateSystem: confirms passcode is valid
                 ExitGateSystem-->>User: opens gate
             else Passcode SAI
@@ -135,7 +133,7 @@ erDiagram
         string passcode "Mã bí mật 6 ký tự ngẫu nhiên"
         string hash_value "HMAC-SHA256 Hash kiểm tra tính toàn vẹn"
         string gate_in "Tên cổng vào (e.g., Gate A)"
-        string gate_out "Tên cổng ra (nullable)"
+        string gate_out "Tên cổng ra (nullable, ghi khi xác thực thành công)"
         datetime entry_time "Thời gian vào"
         datetime exit_time "Thời gian ra (nullable)"
         datetime expiry_time "Thời gian hết hạn vé"
@@ -150,17 +148,17 @@ erDiagram
 
 | Endpoint | Method | Mới/Cũ | Mô tả Chức năng | Response Thành công | Response Lỗi |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `/entry/{gate_id}` | `GET` | **UC-101** | Quét QR cổng vào. Kiểm tra chỗ trống, khởi tạo Session, gán Slot và Redirect tới trang vé. | `302 Found` (Redirect tới `/ticket/{session_id}`) | `503 Service Unavailable` (`"No available slots"`) |
+| `/entry/{gate_id}` | `GET` | **UC-101** | Quét QR cổng vào. Kiểm tra chỗ trống, khởi tạo Session, gán Slot, ghi `gate_in` và Redirect tới trang vé. | `302 Found` (Redirect tới `/ticket/{session_id}`) | `503 Service Unavailable` (`"No available slots"`) |
 | `/ticket/{session_id}` | `GET` | **UC-102** | Hiển thị giao diện vé gửi xe (Slot, Passcode, QR code ra cổng). | `200 OK` (HTML Ticket Page) | `404 Not Found` (`"Ticket not found"`) |
 | `/verify` | `GET` | **UC-103** | Xác thực QR ra cổng (Validate `hash` và `expiry_time`). Nếu hợp lệ, trả về form nhập Passcode. | `200 OK` (HTML Passcode Form) | `403 Forbidden` (`"Invalid or expired ticket"`) |
-| `/verify` | `POST` | **UC-103** | Xử lý Passcode. Kiểm tra đúng/sai, tăng `failed_attempts`, chuyển trạng thái `EXITED` hoặc `LOCKED`. | `200 OK` (`"Verification successful. Gate opening."`) | `403 Forbidden` (`"Invalid passcode"` hoặc `"Ticket LOCKED"`) |
+| `/verify` | `POST` | **UC-103** | Xử lý Passcode (kèm `gate_id` của cổng ra). Kiểm tra đúng/sai, tăng `failed_attempts`, ghi `gate_out` + `exit_time`, chuyển trạng thái `EXITED` hoặc `LOCKED`. | `200 OK` (`"Verification successful. Gate opening."`) | `403 Forbidden` (`"Invalid passcode"` hoặc `"Ticket LOCKED"`) |
 
 ---
 
 ## 🔐 Cơ Chế Bảo Mật & Quản Lý Vận Hành (Security & Logic Highlights)
 
 1. **Chống Làm Giả Vé (Forgery Prevention):** Mỗi URL trên QR vé đều đi kèm mã `hash = HMAC-SHA256(SECRET_KEY, session_id)`. Kẻ gian sửa `session_id` sẽ làm sai Hash.
-2. **Chống Tấn Công Dò Mã (Brute-Force Protection):** Khi quét thành công QR ra cổng, người dùng có tối đa 5 lần nhập Passcode. Nếu sai quá 5 lần, Session chuyển sang trạng thái **`LOCKED`** và yêu cầu Admin/Bảo vệ can thiệp.
+2. **Chống Tấn Công Dò Mã (Brute-Force Protection):** Khi quét thành công QR ra cổng, người dùng có tối đa 5 lần nhập Passcode. Nếu sai quá 5 lần, Session chuyển sang trạng thái **`LOCKED`** và yêu cầu nhân viên bảo vệ can thiệp thủ công (tra cứu qua `session_id`).
 3. **Luồng Chạy Ngầm Tự Động (Background Cleanup Job):** Một tiến trình Cron Job (`BG-001`) chạy ngầm định kỳ 5 phút/lần quét các phiên có `status == ACTIVE` nhưng `expiry_time < Current_Time`. Tiến trình này sẽ tự động cập nhật `status = EXPIRED` và đưa `PARKING_SLOT` về trạng thái `AVAILABLE`.
 
 ---
@@ -213,7 +211,4 @@ pip install -r requirements.txt
 python -m uvicorn app.main:app --reload
 ```
 
- Châu Anh 
-
-
-
+ Châu Anh
